@@ -13,12 +13,15 @@ public class ClientConnection extends Thread {
     private DataOutputStream out;
     private String userName;
 
-    public ClientConnection(Socket socket){
+    private Server server;
+
+    public ClientConnection(Socket socket, Server server){
         try {
             this.socket = socket;
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
             this.userName = in.readUTF();
+            this.server = server;
             clientList.add(this);
 
         } catch (IOException e) {
@@ -47,5 +50,21 @@ public class ClientConnection extends Thread {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    public Socket getSocket() {
+        return socket;
+    }
+
+    public void setSocket(Socket socket) {
+        this.socket = socket;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
     }
 }
