@@ -21,25 +21,62 @@ public class ClienteSwing extends JFrame {
     private int serverPort = 8501;
 
     public ClienteSwing() {
-        this.username = JOptionPane.showInputDialog(this, "Digite seu nome de usuário:", "Login", JOptionPane.PLAIN_MESSAGE);
-        if (this.username == null || this.username.trim().isEmpty()) {
-            System.out.println("Nome de usuário não fornecido. Saindo.");
-            System.exit(0);
+        while (true) {
+            this.username = JOptionPane.showInputDialog(this, "Digite seu nome de usuário:", "Login", JOptionPane.PLAIN_MESSAGE);
+            if (this.username == null) {
+                // Se o usuário cancelar (pressionar "Cancelar" ou fechar a janela), confirmamos se quer sair.
+                int confirm = JOptionPane.showConfirmDialog(this, "Deseja realmente sair?", "Confirmar Saída", JOptionPane.YES_NO_OPTION);
+                if (confirm == JOptionPane.YES_OPTION) {
+                    System.exit(0);
+                }
+                // Caso contrário, continua no loop para digitar novamente.
+                continue;
+            }
+            boolean usuarioValido = verificaUsuario();
+            if (!usuarioValido){
+                JOptionPane.showMessageDialog(this, "Usuário inválido! Não são permitidos espaços ou usuários vazios.", "Erro ao escolher usuário", JOptionPane.ERROR_MESSAGE);
+                continue;
+            }
+            try {
+                fecharConexao();
+                conectarAoServidor();
+            } catch (UnknownHostException e) {
+                JOptionPane.showMessageDialog(this, "Servidor não encontrado: " + e.getMessage(), "Erro de Conexão", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Erro de E/S ao conectar: " + e.getMessage(), "Erro de Conexão", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
+            try {
+                boolean usuarioEmUso = objIn.readBoolean();
+                System.out.println("Usuario em uso: " + usuarioEmUso);
+                if (usuarioEmUso){
+//                    fecharConexao();
+                    JOptionPane.showMessageDialog(this, "O usuário escolhido já está em uso! ", "Usuário em uso", JOptionPane.ERROR_MESSAGE);
+                    continue;
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            break;
         }
+
 
         configurarUI();
-
-        try {
-            conectarAoServidor();
-            iniciarEscutaDeMensagens();
-        } catch (UnknownHostException e) {
-            JOptionPane.showMessageDialog(this, "Servidor não encontrado: " + e.getMessage(), "Erro de Conexão", JOptionPane.ERROR_MESSAGE);
-            System.exit(1);
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Erro de E/S ao conectar: " + e.getMessage(), "Erro de Conexão", JOptionPane.ERROR_MESSAGE);
-            System.exit(1);
-        }
+        inicializarInterfaceChat();
+        iniciarEscutaDeMensagens();
     }
+
+    private boolean verificaUsuario(){
+        if (this.username.trim().isEmpty()) {
+            return false;
+        }
+        if (this.username.contains(" ")){
+            return false;
+        }
+        return true;
+    }
+
 
     private void configurarUI() {
         setTitle("Chat TCP - Cliente: " + username);
@@ -77,9 +114,11 @@ public class ClienteSwing extends JFrame {
         socket = new Socket(serverAddress, serverPort);
         objOut = new ObjectOutputStream(socket.getOutputStream());
         objIn = new ObjectInputStream(socket.getInputStream());
-
         objOut.writeObject(username);
         objOut.flush();
+    }
+
+    private void inicializarInterfaceChat() {
         areaTextoChat.append("Conectado ao servidor como " + username + "\n");
         areaTextoChat.append("Digite '/privado <usuario> <mensagem>' para msg privada.\n");
         areaTextoChat.append("Digite '/usuarios' para listar usuários.\n");
@@ -187,7 +226,8 @@ public class ClienteSwing extends JFrame {
 
     private void fecharConexao() {
         try {
-            areaTextoChat.append("[INFO] Desconectando...\n");
+            if (areaTextoChat != null)
+                areaTextoChat.append("[INFO] Desconectando...\n");
             if (objOut != null) {
                 objOut.close();
             }
@@ -200,8 +240,10 @@ public class ClienteSwing extends JFrame {
         } catch (IOException e) {
             System.err.println("Erro menor ao fechar conexão: " + e.getMessage());
         } finally {
-            campoEntradaMensagem.setEnabled(false);
-            botaoEnviar.setEnabled(false);
+            if (campoEntradaMensagem != null)
+                campoEntradaMensagem.setEnabled(false);
+            if (botaoEnviar != null)
+                botaoEnviar.setEnabled(false);
         }
     }
 

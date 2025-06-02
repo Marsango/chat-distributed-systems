@@ -8,7 +8,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ClientConnection extends Thread {
     private Socket socket;
-    private static List<ClientConnection> clientList = new CopyOnWriteArrayList<>();
+    private static final List<ClientConnection> clientList = new CopyOnWriteArrayList<>();
     private ObjectOutputStream objOut;
     private ObjectInputStream objIn;
     private String userName;
@@ -19,6 +19,12 @@ public class ClientConnection extends Thread {
             this.objOut = new ObjectOutputStream(socket.getOutputStream());
             this.objIn = new ObjectInputStream(socket.getInputStream());
             this.userName = (String) objIn.readObject();
+            boolean userNameTaken = usernameAlreadyTaken();
+            objOut.writeBoolean(userNameTaken);
+            objOut.flush();
+            if (userNameTaken) {
+                return;
+            }
             clientList.add(this);
 
             System.out.println("[SERVIDOR] " + userName + " conectado " + clientList.size());
@@ -28,6 +34,15 @@ public class ClientConnection extends Thread {
             System.err.println("[SERVIDOR] Erro ao conectar o cliente " + e.getMessage());
             closeConnection();
         }
+    }
+
+    public boolean usernameAlreadyTaken() {
+        for (ClientConnection clientConnection : clientList) {
+            if (clientConnection.userName.equals(this.userName)){
+                return true;
+            }
+        }
+        return false;
     }
 
     // Método para enviar Message objects
@@ -124,7 +139,7 @@ public class ClientConnection extends Thread {
                         } else {
                             // Usuário destinatário não encontrado
                             System.out.println("[SERVIDOR] Destinatário da mensagem privada '" + messageFromClient.getReceiver() + "' não encontrado.");
-                            Message errorMsg = new Message("SERVIDOR", messageFromClient.getSender(), "Usuário '" + messageFromClient.getReceiver() + "' não encontrado ou não conctado.");
+                            Message errorMsg = new Message("SERVIDOR", messageFromClient.getSender(), "Usuário '" + messageFromClient.getReceiver() + "' não encontrado ou não conectado.");
                             sendMessageToClient(errorMsg);
                         }
                     }
@@ -173,7 +188,7 @@ public class ClientConnection extends Thread {
             if (objOut != null) objOut.close();
             if (socket != null && !socket.isClosed()) socket.close();
         } catch (IOException e) {
-            System.err.println("[SERVEIDOR] Erro ao fechar recursos para " + (userName != null ? userName : "socket") + ": " + e.getMessage());
+            System.err.println("[SERVIDOR] Erro ao fechar recursos para " + (userName != null ? userName : "socket") + ": " + e.getMessage());
         }
     }
 }
