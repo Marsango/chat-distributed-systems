@@ -6,6 +6,7 @@ import java.awt.event.*;
 import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class ClienteSwing extends JFrame {
@@ -34,7 +35,7 @@ public class ClienteSwing extends JFrame {
             }
             boolean usuarioValido = verificaUsuario();
             if (!usuarioValido){
-                JOptionPane.showMessageDialog(this, "Usuário inválido! Não são permitidos espaços ou usuários vazios.", "Erro ao escolher usuário", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Usuário inválido! Não são permitidos espaços, barra ou vazio.", "Erro ao escolher usuário", JOptionPane.ERROR_MESSAGE);
                 continue;
             }
             try {
@@ -72,6 +73,9 @@ public class ClienteSwing extends JFrame {
             return false;
         }
         if (this.username.contains(" ")){
+            return false;
+        }
+        if (this.username.contains("/")){
             return false;
         }
         return true;
@@ -121,14 +125,18 @@ public class ClienteSwing extends JFrame {
     private void inicializarInterfaceChat() {
         areaTextoChat.append("Conectado ao servidor como " + username + "\n");
         areaTextoChat.append("Digite '/privado <usuario> <mensagem>' para msg privada.\n");
+        areaTextoChat.append("Digite '/ignorar <usuario>' para ignorar as mensagens de um usuário.\n");
+        areaTextoChat.append("Digite '/designorar <usuario>' para designorar as mensagens de um usuário.\n");
+        areaTextoChat.append("Digite '/ignorados' para listar todos os usuários ignorados.\n");
         areaTextoChat.append("Digite '/usuarios' para listar usuários.\n");
         areaTextoChat.append("Digite '/quit' ou feche a janela para sair.\n");
+        areaTextoChat.append("Digite '/ajuda' para ver os comandos novamente.\n");
     }
 
     private void enviarMensagemDoCampo() {
         String texto = campoEntradaMensagem.getText().trim();
         if (!texto.isEmpty()) {
-            Message mensagemParaEnviar;
+            Message mensagemParaEnviar = null;
 
             if (texto.equalsIgnoreCase("/quit")) {
                 confirmarSaida();
@@ -147,20 +155,55 @@ public class ClienteSwing extends JFrame {
                 mensagemParaEnviar = new Message(username, destinatario, "/privado:" + conteudoPrivado);
                 // Exibe a mensagem privada enviada na própria tela
                 areaTextoChat.append(String.format("[%s] Você (privado para %s): %s\n",
-                        java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
+                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                         destinatario,
                         conteudoPrivado));
 
-            } else {
+            } else if (texto.toLowerCase().startsWith("/ignorar ")) {
+                String[] partes = texto.split(" ");
+                if (partes.length != 2) {
+                    areaTextoChat.append("[AVISO] Formato inválido. Use: /ignorar <usuario>\n");
+                    campoEntradaMensagem.setText("");
+                    return;
+                }
+                String destinatario = partes[1];
+                mensagemParaEnviar = new Message(username, destinatario, "/ignorar");
+
+                areaTextoChat.append(String.format("[%s] Você ignorou o usuário %s\n",
+                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
+                        destinatario));
+            } else if (texto.toLowerCase().startsWith("/designorar ")){
+                String[] partes = texto.split(" ");
+                if (partes.length != 2) {
+                    areaTextoChat.append("[AVISO] Formato inválido. Use: /designorar <usuario>\n");
+                    campoEntradaMensagem.setText("");
+                    return;
+                }
+                String destinatario = partes[1];
+                mensagemParaEnviar = new Message(username, destinatario, "/designorar");
+
+                areaTextoChat.append(String.format("[%s] Você designorou o usuário %s\n",
+                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
+                        destinatario));
+            }  else if (texto.equalsIgnoreCase("/ignorados")){
+                mensagemParaEnviar = new Message(username, null, "/ignorados");
+            } else if (texto.equalsIgnoreCase("/ajuda")) {
+                inicializarInterfaceChat();
+            } else if (texto.startsWith("/")){
+                areaTextoChat.append("[AVISO] Comando não encontrado ou digitado de forma errônea.");
+            }
+            else {
                 mensagemParaEnviar = new Message(username, null, texto);
                 areaTextoChat.append(String.format("[%s] Você: %s\n",
-                        java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
+                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                         texto));
             }
 
             try {
-                objOut.writeObject(mensagemParaEnviar);
-                objOut.flush();
+                if (mensagemParaEnviar != null){
+                    objOut.writeObject(mensagemParaEnviar);
+                    objOut.flush();
+                }
             } catch (IOException ex) {
                 areaTextoChat.append("[ERRO] Falha ao enviar mensagem: " + ex.getMessage() + "\n");
             }
@@ -192,6 +235,7 @@ public class ClienteSwing extends JFrame {
                 }
             } finally {
                 fecharConexao();
+                System.exit(0);
             }
         }).start();
     }
